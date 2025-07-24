@@ -21,10 +21,12 @@ test_results/
 *.mp4
 *.zip
 *.tar.gz
+*.png
 
 *.egg-info/
 dist/
 build/
+data_road/
 
 demomy.py
 generate_fcn_lists.py
