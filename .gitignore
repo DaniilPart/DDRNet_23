@@ -26,7 +26,6 @@ test_results/
 *.egg-info/
 dist/
 build/
-data_road/
 
 demomy.py
 generate_fcn_lists.py
