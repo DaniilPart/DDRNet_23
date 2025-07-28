@@ -27,7 +27,6 @@ test_results/
 dist/
 build/
 
-demomy.py
 generate_fcn_lists.py
 generate_lst.py
 masks_transfer.py
