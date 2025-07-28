@@ -1,4 +1,5 @@
 # DDRNet-23 Slim: Simple Project README
+[Original source](https://github.com/ydhongHIT/DDRNet?tab=readme-ov-file)
 
 ## Project Folders
 
