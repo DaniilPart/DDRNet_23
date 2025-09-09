@@ -11,9 +11,9 @@ import models
 from config import config
 from config import update_config
 
-CFG_PATH = '/home/daniil/PycharmProjects/DDRNet.pytorch/experiments/rugd/finetune_ddrnet23.yaml'
-MODEL_PATH = '/home/daniil/PycharmProjects/DDRNet.pytorch/output/finetune_on_binary_data/BinaryMaskDataset/finetune_ddrnet23/checkpoint.pth.tar'
-IMAGE_PATH = '/home/daniil/PycharmProjects/DDRNet.pytorch/teste5.png'
+CFG_PATH = './experiments/rugd/finetune_ddrnet23.yaml'
+MODEL_PATH = './output/finetune_on_binary_data/BinaryMaskDataset/finetune_ddrnet23/best.pth'
+IMAGE_PATH = './teste5.png'
 OUTPUT_FILENAME = 'segmentation_result'
 
 
@@ -91,20 +91,17 @@ def main():
 
     final_output = (torch.softmax(original_output, dim=1) + torch.softmax(flipped_output, dim=1)) / 2.0
 
-    padded_size = max(image.size)
+    target_height = config.TEST.IMAGE_SIZE[1]
+    target_width = config.TEST.IMAGE_SIZE[0]
+    target_size = (target_height, target_width)
+
     upsampled_output = torch.nn.functional.interpolate(
         final_output,
-        size=(padded_size, padded_size),
+        size=target_size,
         mode='bilinear',
         align_corners=False
     )
     prediction = torch.argmax(upsampled_output, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
-
-    w, h = image.size
-    max_dim = max(w, h)
-    h_padding = (max_dim - w) // 2
-    v_padding = (max_dim - h) // 2
-    prediction = prediction[v_padding:v_padding + h, h_padding:h_padding + w]
 
     palette = np.zeros((256, 3), dtype=np.uint8)
     palette[0] = [0, 0, 0]
@@ -117,11 +114,15 @@ def main():
     overlay_output_path = f"{OUTPUT_FILENAME}_overlay.png"
 
     cv2.imwrite(mask_output_path, cv2.cvtColor(color_mask_rgb, cv2.COLOR_RGB2BGR))
-    overlay = cv2.addWeighted(original_image_cv, 0.6, cv2.cvtColor(color_mask_rgb, cv2.COLOR_RGB2BGR), 0.4, 0)
+
+    original_image_resized = cv2.resize(original_image_cv, (target_width, target_height))
+
+    overlay = cv2.addWeighted(original_image_resized, 0.6, cv2.cvtColor(color_mask_rgb, cv2.COLOR_RGB2BGR), 0.4, 0)
     cv2.imwrite(overlay_output_path, overlay)
 
-    print(f"Segmentation mask saved to {mask_output_path}")
-    print(f"Overlay image saved to {overlay_output_path}")
+
+    print(f"Segmentation mask saved to {mask_output_path} with size {target_width}x{target_height}")
+    print(f"Overlay image saved to {overlay_output_path} with size {target_width}x{target_height}")
 
 
 if __name__ == '__main__':

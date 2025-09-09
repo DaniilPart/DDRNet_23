@@ -43,8 +43,8 @@ class CrossEntropy(nn.Module):
 
 
 class OhemCrossEntropy(nn.Module):
-    def __init__(self, ignore_label=-1, thres=0.7,
-                 min_kept=100000, weight=None):
+    def __init__(self, ignore_label=-1, thres=0.8,
+                 min_kept=1000, weight=None):
         super(OhemCrossEntropy, self).__init__()
         self.thresh = thres
         self.min_kept = max(1, min_kept)
@@ -102,64 +102,34 @@ class OhemCrossEntropy(nn.Module):
             for (w, x, func) in zip(weights, score, functions)
         ])
 
+class FocalLoss(nn.Module):
 
-class DiceLoss(nn.Module):
-    def __init__(self, smooth=1e-5):
-        super(DiceLoss, self).__init__()
-        self.smooth = smooth
-
-    def forward(self, logits, targets):
-        num_classes = logits.shape[1]
-        probs = F.softmax(logits, dim=1)
-        loss = 0
-
-        for i in range(num_classes):
-            class_probs = probs[:, i]
-            class_targets = (targets == i).float()
-            intersection = (class_probs * class_targets).sum()
-            union = class_probs.sum() + class_targets.sum()
-            dice_coeff = (2. * intersection + self.smooth) / (union + self.smooth)
-            loss += (1 - dice_coeff)
-        return loss / num_classes
-
-
-class HybridLoss(nn.Module):
-    def __init__(self, alpha=1.0, beta=1.0, ignore_label=255):
-        super(HybridLoss, self).__init__()
+    def __init__(self, alpha=0.5, gamma=2, ignore_label=255):
+        super(FocalLoss, self).__init__()
         self.alpha = alpha
-        self.beta = beta
-        self.dice_loss = DiceLoss()
-        self.ce_loss = nn.CrossEntropyLoss(ignore_index=ignore_label)
+        self.gamma = gamma
+        self.ignore_label = ignore_label
+        self.ce_loss = nn.CrossEntropyLoss(
+            ignore_index=ignore_label,
+            reduction='none'
+        )
 
     def forward(self, logits, targets):
-        if not isinstance(logits, list):
-            logits = [logits]
+        if isinstance(logits, list):
+            logits = logits[config.TEST.OUTPUT_INDEX]
 
-        try:
-            weights = config.LOSS.BALANCE_WEIGHTS
-            if len(weights) != len(logits):
-                weights = [1.0] * len(logits)
-        except (NameError, AttributeError):
-            weights = [1.0] * len(logits)
+        pred_h, pred_w = logits.shape[2], logits.shape[3]
+        if pred_h != targets.shape[1] or pred_w != targets.shape[2]:
+            targets_resized = F.interpolate(
+                targets.unsqueeze(1).float(),
+                size=(pred_h, pred_w),
+                mode='nearest'
+            ).squeeze(1).long()
+        else:
+            targets_resized = targets
 
-        total_loss = 0
-        for i, score in enumerate(logits):
-            ph, pw = score.shape[2], score.shape[3]
-            h, w = targets.shape[1], targets.shape[2]
+        log_pt = -self.ce_loss(logits, targets_resized)
+        pt = torch.exp(log_pt)
+        focal_loss = -self.alpha * (1 - pt)**self.gamma * log_pt
 
-            if ph != h or pw != w:
-                targets_resized = F.interpolate(targets.unsqueeze(1).float(), size=(ph, pw), mode='nearest').squeeze(
-                    1).long()
-            else:
-                targets_resized = targets
-
-            ce_val = self.ce_loss(score, targets_resized)
-            dice_val = self.dice_loss(score, targets_resized)
-
-            hybrid_loss_per_output = self.alpha * ce_val + self.beta * dice_val
-
-            total_loss += weights[i] * hybrid_loss_per_output
-
-        return total_loss
-
-
+        return focal_loss.mean()

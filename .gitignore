@@ -1,5 +1,7 @@
 venv/
 .venv/
+venv12/
+.venv12/
 env/
 .env
 

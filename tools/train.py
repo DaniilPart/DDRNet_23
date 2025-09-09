@@ -120,6 +120,7 @@ def main():
         batch_size = config.TRAIN.BATCH_SIZE_PER_GPU * len(gpus)
 
     crop_size = (config.TRAIN.IMAGE_SIZE[1], config.TRAIN.IMAGE_SIZE[0])
+
     train_dataset = eval('datasets.' + config.DATASET.DATASET)(
         root=config.DATASET.ROOT,
         list_path=config.DATASET.TRAIN_SET,
